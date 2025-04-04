@@ -1,0 +1,57 @@
+name: Laravel CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  laravel-tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: laravel
+          MYSQL_USER: laravel
+          MYSQL_PASSWORD: secret
+        ports:
+          - "3306:3306"
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, ctype, fileinfo, openssl, PDO, mysql, pdo_mysql, tokenizer, xml
+          coverage: none
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Copy .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Build assets with Vite
+        run: npm run build
+
+      - name: Run migrations and seed
+        run: php artisan migrate --seed --force
+
+      - name: Execute tests (PHPUnit)
+        run: php artisan test
